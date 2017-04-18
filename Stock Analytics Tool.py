@@ -48,6 +48,41 @@ def buy_sell(data_frame, portfolio_value, commission, stop_loss):
     data_frame['Portfolio'] = data_frame['Buying Power'] + data_frame['Shares'] * data_frame['Open']
 
 
+def plot_decorator(function):
+    def signals(dataframe, tool, col, label, color):
+        function(dataframe, tool, col, label, color)
+        print()
+        if tool[0].empty == 0:
+            plt.plot(tool[0].index, tool[0][col], marker='^', markersize=10, linestyle="None",
+                     color='g', label='Buy')
+        if tool[1].empty == 0:
+            plt.plot(tool[1].index, tool[1][col], marker='v', markersize=10, linestyle="None",
+                     color='r', label='Sell')
+        plt.xlabel('Date')
+        plt.legend(loc='upper left')
+
+    return signals
+
+
+@plot_decorator
+def close_plot(dataframe, tool, col, label, color):
+    dataframe[col].plot(label=label, color=color)
+    plt.title(label[:-1]+'ing Price')
+    plt.ylabel('Share Price')
+
+
+@plot_decorator
+def signal_plot(dataframe, tool, col, label, color):
+    dataframe[col].plot(label=label, color=color)
+
+
+@plot_decorator
+def port_plot(dataframe, tool, col, label, color):
+    dataframe[col].plot(label=label, color=color)
+    plt.title('Portfolio')
+    plt.ylabel('Portfolio Value')
+
+
 def sma_fast_slow():
     while True:
         fast = input("Please enter fast moving average day count if left blank will be set to 5 days: ")
@@ -92,44 +127,22 @@ def sma(stock_name, stock, portfolio_initial_value, commission, stop_loss_percen
     buy__s_m_a = stock__s_m_a[stock__s_m_a['Buy or Sell'] == 1]
     sell__s_m_a = stock__s_m_a[stock__s_m_a['Buy or Sell'] == -1]
 
+    buy_sell_sig = [buy__s_m_a, sell__s_m_a]
+
     # PLOTS################################################
     plt.figure(figsize=(15, 10))
     plt.subplot(311)
-    stock__s_m_a['Close'].plot(label='{} Close'.format(stock_name), color='k')
-    plt.title('{} Closing Price and {} Day Moving Average'.format(stock_name, fast))
-    plt.ylabel('Share Price')
-    if buy__s_m_a.empty == 0:
-        plt.plot(buy__s_m_a.index, buy__s_m_a['Close'], marker='^', markersize=10, linestyle="None", color='g',
-                 label='Buy')
-    if sell__s_m_a.empty == 0:
-        plt.plot(sell__s_m_a.index, sell__s_m_a['Close'], marker='v', markersize=10, linestyle="None", color='r',
-                 label='Sell')
-    plt.legend(loc='upper left')
+    label = '{} Close'.format(stock_name.upper())
+    close_plot(stock__s_m_a, buy_sell_sig, 'Close', label, 'k')
 
     plt.subplot(312)
-    stock__s_m_a['Fast SMA'].plot(label='{} Day Avg'.format(fast), color='c')
-    stock__s_m_a['Slow SMA'].plot(label='{} Day Avg'.format(slow), color='m')
-    plt.title('{} - {} Day Moving Average and {} Day Moving Average'.format(stock_name, fast, slow))
-    if buy__s_m_a.empty == 0:
-        plt.plot(buy__s_m_a.index, buy__s_m_a['Fast SMA'], marker='^', markersize=10, linestyle="None", color='g',
-                 label='Buy')
-    if sell__s_m_a.empty == 0:
-        plt.plot(sell__s_m_a.index, sell__s_m_a['Fast SMA'], marker='v', markersize=10, linestyle="None", color='r',
-                 label='Sell')
-    plt.legend(loc='upper left')
+    stock__s_m_a['Fast SMA'].plot(label='{} Day Avg'.format(fast), color='m')
+    label = '{} Day Avg'.format(slow)
+    signal_plot(stock__s_m_a, buy_sell_sig, 'Slow SMA', label, 'c')
+    plt.title('{} - {} Day Moving Average and {} Day Moving Average'.format(stock_name.upper(), fast, slow))
 
     plt.subplot(313)
-    plt.plot(stock__s_m_a['Portfolio'], label='Portfolio Value', color='k')
-    plt.title('Portfolio Value')
-    if buy__s_m_a.empty == 0:
-        plt.plot(buy__s_m_a.index, buy__s_m_a['Portfolio'], marker='^', markersize=10, linestyle="None", color='g',
-                 label='Buy')
-    if sell__s_m_a.empty == 0:
-        plt.plot(sell__s_m_a.index, sell__s_m_a['Portfolio'], marker='v', markersize=10, linestyle="None", color='r',
-                 label='Sell')
-    plt.title('Portfolio Value'.format(stock_name, fast, slow))
-    plt.xlabel('Date')
-    plt.legend(loc='upper left')
+    port_plot(stock__s_m_a, buy_sell_sig, 'Portfolio', 'Portfolio Value', 'k')
 
     plt.tight_layout()
     plt.show()
@@ -200,44 +213,23 @@ def macd(stock_name, stock, portfolio_initial_value, commission, stop_loss_perce
     buy__m_a_c_d = stock__m_a_c_d[stock__m_a_c_d['Buy or Sell'] == 1]
     sell__m_a_c_d = stock__m_a_c_d[stock__m_a_c_d['Buy or Sell'] == -1]
 
+    buy_sell_sig = [buy__m_a_c_d, sell__m_a_c_d]
+
     # PLOTS################################################
     plt.figure(figsize=(15, 10))
+
     plt.subplot(311)
-    stock__m_a_c_d['Close'].plot(label='{} Close'.format(stock_name), color='k')
-    plt.title('{} Closing Price'.format(stock_name))
-    plt.ylabel('Share Price')
-    if buy__m_a_c_d.empty == 0:
-        plt.plot(buy__m_a_c_d.index, buy__m_a_c_d['Close'], marker='^', markersize=10, linestyle="None", color='g',
-                 label='Buy')
-    if sell__m_a_c_d.empty == 0:
-        plt.plot(sell__m_a_c_d.index, sell__m_a_c_d['Close'], marker='v', markersize=10, linestyle="None", color='r',
-                 label='Sell')
-    plt.legend(loc='upper left')
+    label = '{} Close'.format(stock_name.upper())
+    close_plot(stock__m_a_c_d, buy_sell_sig, 'Close', label, 'k')
 
     plt.subplot(312)
-    stock__m_a_c_d['MACD'].plot(label='MACD', color='c')
-    stock__m_a_c_d['Signal'].plot(label='Signal', color='m')
-    plt.title('{} - MACD and Signal'.format(stock_name))
-    if buy__m_a_c_d.empty == 0:
-        plt.plot(buy__m_a_c_d.index, buy__m_a_c_d['Signal'], marker='^', markersize=10, linestyle="None", color='g',
-                 label='Buy')
-    if sell__m_a_c_d.empty == 0:
-        plt.plot(sell__m_a_c_d.index, sell__m_a_c_d['Signal'], marker='v', markersize=10, linestyle="None", color='r',
-                 label='Sell')
-    plt.legend(loc='upper left')
+    stock__m_a_c_d['MACD'].plot(label='MACD', color='m')
+    label = 'Signal'
+    signal_plot(stock__m_a_c_d, buy_sell_sig, 'Signal', label, 'c')
+    plt.title('{} - MACD and Signal'.format(stock_name.upper()))
 
     plt.subplot(313)
-    plt.plot(stock__m_a_c_d['Portfolio'], label='Portfolio Value', color='k')
-    plt.title('Portfolio Value')
-    if buy__m_a_c_d.empty == 0:
-        plt.plot(buy__m_a_c_d.index, buy__m_a_c_d['Portfolio'], marker='^', markersize=10, linestyle="None", color='g',
-                 label='Buy')
-    if sell__m_a_c_d.empty == 0:
-        plt.plot(sell__m_a_c_d.index, sell__m_a_c_d['Portfolio'], marker='v', markersize=10, linestyle="None",
-                 color='r',
-                 label='Sell')
-    plt.xlabel('Date')
-    plt.legend(loc='upper left')
+    port_plot(stock__m_a_c_d, buy_sell_sig, 'Portfolio', 'Portfolio Value', 'k')
 
     plt.tight_layout()
     plt.show()
@@ -267,57 +259,39 @@ def bbands(stock_name, stock, portfolio_initial_value, commission, stop_loss_per
     buy__b_bands = stock__b_bands[stock__b_bands['Buy or Sell'] == 1]
     sell__b_bands = stock__b_bands[stock__b_bands['Buy or Sell'] == -1]
 
+    buy_sell_sig = [buy__b_bands, sell__b_bands]
+
     # PLOTS################################################
     plt.figure(figsize=(15, 10))
+
     plt.subplot(311)
-    stock__b_bands['Close'].plot(label='{} Close'.format(stock_name), color='k')
-    upp_band.plot(label='Upper Band', color='b', linestyle='--')
-    low_band.plot(label='Lower Band', color='b', linestyle='--')
-    if buy__b_bands.empty == 0:
-        plt.plot(buy__b_bands.index, buy__b_bands['Close'], marker='^', markersize=10, linestyle="None", color='g',
-                 label='Buy')
-    if sell__b_bands.empty == 0:
-        plt.plot(sell__b_bands.index, sell__b_bands['Close'], marker='v', markersize=10, linestyle="None", color='r',
-                 label='Sell')
-    plt.title('{} - Closing Price with Bollinger Bands'.format(stock_name))
-    plt.ylabel('Share Price')
-    plt.legend(loc='upper left')
+    label = '{} Close'.format(stock_name.upper())
+    close_plot(stock__b_bands, buy_sell_sig, 'Close', label, 'k')
 
     plt.subplot(312)
-    twenty_day_avg.plot(label='Middle Band', color='Grey', linestyle='--')
     upp_band.plot(label='Upper Band', color='b', linestyle='--')
     low_band.plot(label='Lower Band', color='b', linestyle='--')
-    plt.title('{} - Bollinger Bands'.format(stock_name))
-    plt.legend(loc='upper left')
+    label = '{} Close'.format(stock_name.upper())
+    signal_plot(stock__b_bands, buy_sell_sig, 'Close', label, 'k')
+    plt.title('{} - Bollinger Bands'.format(stock_name.upper()))
 
     plt.subplot(313)
-    plt.plot(stock__b_bands['Portfolio'], label='Portfolio Value', color='k')
-    plt.title('Portfolio Value')
-    if buy__b_bands.empty == 0:
-        plt.plot(buy__b_bands.index, buy__b_bands['Portfolio'], marker='^', markersize=10, linestyle="None", color='g',
-                 label='Buy')
-    if sell__b_bands.empty == 0:
-        plt.plot(sell__b_bands.index, sell__b_bands['Portfolio'], marker='v', markersize=10, linestyle="None",
-                 color='r',
-                 label='Sell')
-    plt.xlabel('Date')
-    plt.legend(loc='upper left')
-
+    port_plot(stock__b_bands, buy_sell_sig, 'Portfolio', 'Portfolio Value', 'k')
     plt.tight_layout()
     plt.show()
 
 
 def rsi(stock_name, stock, portfolio_initial_value, commission, stop_loss_percentage):
-    Top_BBand = 70
-    Lower_BBand = 30
+    top__b_band = 70
+    lower__b_band = 30
     interval = 14
 
-    Stock_RSI = stock.copy()
-    New_col = pd.DataFrame(columns=['Buy/Sell', 'Buy or Sell', 'Own', 'Shares', 'Buying Power'])
-    Stock_RSI = Stock_RSI.join(New_col)
+    stock__r_s_i = stock.copy()
+    new_col = pd.DataFrame(columns=['Buy/Sell', 'Buy or Sell', 'Own', 'Shares', 'Buying Power'])
+    stock__r_s_i = stock__r_s_i.join(new_col)
 
-    # Determing gains and losses on daily basis. Binning gains and losses
-    diff_close = Stock_RSI['Close'].diff()
+    # Determining gains and losses on daily basis. Binning gains and losses
+    diff_close = stock__r_s_i['Close'].diff()
     rs_pos = diff_close.apply(lambda x: x > 0) * diff_close
     rs_neg = diff_close.apply(lambda x: x < 0) * diff_close * -1
 
@@ -327,7 +301,7 @@ def rsi(stock_name, stock, portfolio_initial_value, commission, stop_loss_percen
     # Smoothed Average Gain and Average Loss calculation
     rsp = []
     rsn = []
-    for i in range(0, len(Stock_RSI['Close'])):
+    for i in range(0, len(stock__r_s_i['Close'])):
         if i > 13:
             rsp.append(rs_positive)
             rsn.append(rs_negative)
@@ -337,61 +311,42 @@ def rsi(stock_name, stock, portfolio_initial_value, commission, stop_loss_percen
             rsp.append(0)
             rsn.append(0)
 
-    RS = np.array(rsp) / np.array(rsn)
-    Stock_RSI['RSI'] = 100 - (100 / (1 + RS))
+    r_s = np.array(rsp) / np.array(rsn)
+    stock__r_s_i['RSI'] = 100 - (100 / (1 + r_s))
 
     # equals 1 when crossing BBAnds
-    over = ((Stock_RSI['RSI'] - Top_BBand).apply(lambda x: x > 0))
-    under = ((Stock_RSI['RSI'] - Lower_BBand).apply(lambda x: x < 0))
+    over = ((stock__r_s_i['RSI'] - top__b_band).apply(lambda x: x > 0))
+    under = ((stock__r_s_i['RSI'] - lower__b_band).apply(lambda x: x < 0))
 
-    Stock_RSI['Buy/Sell'] = under + (-1) * over
+    stock__r_s_i['Buy/Sell'] = under + (-1) * over
 
-    buy_sell(Stock_RSI, portfolio_initial_value, commission, stop_loss_percentage)
+    buy_sell(stock__r_s_i, portfolio_initial_value, commission, stop_loss_percentage)
 
-    buy_RSI = Stock_RSI[Stock_RSI['Buy or Sell'] == 1]
-    sell_RSI = Stock_RSI[Stock_RSI['Buy or Sell'] == -1]
+    buy__r_s_i = stock__r_s_i[stock__r_s_i['Buy or Sell'] == 1]
+    sell__r_s_i = stock__r_s_i[stock__r_s_i['Buy or Sell'] == -1]
 
-    start = Stock_RSI.index[0].date()
-    end = Stock_RSI.index[len(Stock_RSI['Close']) - 1].date()
+    buy_sell_sig = [buy__r_s_i, sell__r_s_i]
+
+    start = stock__r_s_i.index[0].date()
+    end = stock__r_s_i.index[len(stock__r_s_i['Close']) - 1].date()
 
     # PLOTS################################################
     plt.figure(figsize=(15, 10))
+
     plt.subplot(311)
-    Stock_RSI['Close'].plot(label='Close', color='k')
-    if buy_RSI.empty == 0:
-        plt.plot(buy_RSI.index, buy_RSI['Close'], marker='^', markersize=10, linestyle="None", color='g', label='Buy')
-    if sell_RSI.empty == 0:
-        plt.plot(sell_RSI.index, sell_RSI['Close'], marker='v', markersize=10, linestyle="None", color='r',
-                 label='Sell')
-    plt.title('{} Closing Price'.format(stock_name))
-    plt.ylabel('Share Price')
-    plt.legend(loc='upper left')
+    label = '{} Close'.format(stock_name.upper())
+    close_plot(stock__r_s_i, buy_sell_sig, 'Close', 'Close', 'k')
 
     plt.subplot(312)
-    plt.title('{} CLosing Price with Relative Strength Index'.format(stock_name))
-    Stock_RSI['RSI'].plot(label='RSI', color='k')
-    plt.hlines(Top_BBand, start, end, color='b', linestyles='--')
-    plt.hlines(50, start, end, color='Grey', linestyles='--')
-    plt.hlines(Lower_BBand, start, end, color='b', linestyles='--')
-    if buy_RSI.empty == 0:
-        plt.plot(buy_RSI.index, buy_RSI['RSI'], marker='^', markersize=10, linestyle="None", color='g', label='Buy')
-    if sell_RSI.empty == 0:
-        plt.plot(sell_RSI.index, sell_RSI['RSI'], marker='v', markersize=10, linestyle="None", color='r', label='Sell')
-    plt.ylim((10, 90))
-    plt.legend(loc='upper left')
+    label = '{} Close'.format(stock_name.upper())
+    signal_plot(stock__r_s_i, buy_sell_sig, 'RSI', label, 'k')
+    plt.hlines(top__b_band, start, end, color='b', linestyles='--')
+    plt.hlines((top__b_band + lower__b_band) / 2, start, end, color='Grey', linestyles='--')
+    plt.hlines(lower__b_band, start, end, color='b', linestyles='--')
+    plt.title('{} Closing Price with Relative Strength Index'.format(stock_name.upper()))
 
     plt.subplot(313)
-    plt.plot(Stock_RSI['Portfolio'], label='Portfolio Value', color='k')
-    plt.title('Portfolio Value')
-    if buy_RSI.empty == 0:
-        plt.plot(buy_RSI.index, buy_RSI['Portfolio'], marker='^', markersize=10, linestyle="None", color='g',
-                 label='Buy')
-    if sell_RSI.empty == 0:
-        plt.plot(sell_RSI.index, sell_RSI['Portfolio'], marker='v', markersize=10, linestyle="None", color='r',
-                 label='Sell')
-    plt.xlabel('Date')
-    plt.legend(loc='upper left')
-
+    port_plot(stock__r_s_i, buy_sell_sig, 'Portfolio', 'Portfolio', 'k')
     plt.tight_layout()
     plt.show()
 
