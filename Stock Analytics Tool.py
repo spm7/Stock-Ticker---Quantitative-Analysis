@@ -48,14 +48,32 @@ def buy_sell(data_frame, portfolio_value, commission, stop_loss):
     data_frame['Portfolio'] = data_frame['Buying Power'] + data_frame['Shares'] * data_frame['Open']
 
 
-def sma(stock_name, stock, portfolio_initial_value, commission, stop_loss_percentage):
-    fast = input("Please enter fast moving average day count if left blank will be set to 5 days: ")
-    slow = input("Please enter slow moving average day count if left blank will be set to 20 days: ")
-    if not fast:
-        fast = 5
-    if not slow:
-        slow = 20
+def sma_fast_slow():
+    while True:
+        fast = input("Please enter fast moving average day count if left blank will be set to 5 days: ")
+        if not fast:
+            fast = 5
+            break
+        elif fast.isnumeric():
+            fast = int(fast)
+            break
+        else:
+            print('Fast moving average was entered incorrectly')
+    while True:
+        slow = input("Please enter slow moving average day count if left blank will be set to 20 days: ")
+        if not slow:
+            slow = 20
+            break
+        elif slow.isnumeric():
+            slow = int(slow)
+            break
+        else:
+            print('Slow moving average was entered incorrectly')
+    return fast, slow
 
+
+def sma(stock_name, stock, portfolio_initial_value, commission, stop_loss_percentage):
+    fast, slow = sma_fast_slow()
     stock__s_m_a = stock.copy()
     new_col = pd.DataFrame(columns=['Buy/Sell', 'Buy or Sell', 'Own', 'Shares', 'Buying Power'])
     stock__s_m_a = stock__s_m_a.join(new_col)
@@ -169,7 +187,8 @@ def macd(stock_name, stock, portfolio_initial_value, commission, stop_loss_perce
         else:
             signal.append(signal_val)
             signal_val = (2 / (e_m_a_len[2] + 1)) * stock__m_a_c_d['MACD'][i] + (
-                                                                                1 - 2 / (e_m_a_len[2] + 1)) * signal_val
+                                                                                    1 - 2 / (
+                                                                                        e_m_a_len[2] + 1)) * signal_val
 
     stock__m_a_c_d['Signal'] = signal
     stock__m_a_c_d['MACD_Hist'] = (stock__m_a_c_d['MACD'] - stock__m_a_c_d['Signal'])
@@ -378,105 +397,140 @@ def rsi(stock_name, stock, portfolio_initial_value, commission, stop_loss_percen
 
 
 def date_select():
-    date_run = input(
-        "Do you want the date range to be a custom date set or have today as last analysis day (custom/today): ")
-    date_run = date_run.lower()
-    if date_run == 'today':
-        start, end = today_start()
-    elif date_run == 'custom':
-        start, end = custom_start()
-    else:
-        print('Value entered incorrectly')
-        date_select()
+    run = True
+    while run:
+        date_run = input(
+            "Do you want the date range to be a custom date set or have today as last analysis day (custom/today): ")
+        date_run = date_run.lower()
+        if date_run == 'today':
+            start, end = today_start()
+            run = False
+        elif date_run == 'custom':
+            start, end = custom_start()
+            run = False
+        else:
+            print('Value entered incorrectly')
     return start, end
 
 
 def today_start():
     end = datetime.date.today()
-    len_dates = float(input("How many months would you like to analyze: "))
-    start = datetime.date.today() - datetime.timedelta(days=len_dates * 30)
+    while True:
+        len_dates = input("How many months would you like to analyze: ")
+        if len_dates.isnumeric():
+            start = datetime.date.today() - datetime.timedelta(days=float(len_dates) * 30)
+            break
+        else:
+            print('Non-numeric value entered')
     return start, end
 
 
 def custom_start():
-    start = input("Enter custom start date YYYY/MM/DD: ")
-    end = input("Enter custom end date YYYY/MM/DD: ")
-    dates_end = end.split('/')
-    if start > end:
-        print('Start date comes after end date, reenter dates')
-        custom_start()
-    elif datetime.date(dates_end[0], dates_end[1], dates_end[2]) > datetime.date.today():
-        print('End date is in the future, reenter dates')
-        custom_start()
-    else:
-        return start, end
+    while True:
+        start = input("Enter custom start date YYYY/MM/DD: ")
+        end = input("Enter custom end date YYYY/MM/DD: ")
+        dates_end = end.split('/')
+        dates_start = start.split('/')
+        if start > end:
+            print('Start date comes after end date, reenter dates')
+        elif datetime.date(dates_end[0], dates_end[1], dates_end[2]) > datetime.date.today():
+            print('End date is in the future, reenter dates')
+        elif len(start) != 10 or len(end) != 10:
+            print('Incorrect date format')
+        elif 1 >= dates_start[1] >= 13 and 1 >= dates_end[1] >= 13:
+            print('Dates entered incorrectly')
+        else:
+            break
+    return start, end
 
 
 def commission_set():
-    comm = input("Enter the stock broker commission rate: ")
-    if comm.isnumeric():
-        commission = float(comm)
-        return commission
-    else:
-        print('A non-numeric value was entered please')
-        commission_set()
+    while True:
+        comm = input("Enter the stock broker commission rate: ")
+        if comm.isnumeric():
+            commission = float(comm)
+            break
+        else:
+            print('A non-numeric value was entered please')
+    return commission
 
 
 def port_initial_val():
-    port = input("Enter the initial portfolio value: ")
-    if port.isnumeric():
-        portfolio_initial_value = float(port)
-        return portfolio_initial_value
-    else:
-        print('A non-numeric value was entered please')
-        port_initial_val()
+    while True:
+        port = input("Enter the initial portfolio value: ")
+        if port.isnumeric():
+            portfolio_initial_value = float(port)
+            break
+        else:
+            print('A non-numeric value was entered please')
+    return portfolio_initial_value
 
 
 def stop_loss_p():
-    stop_loss = input("Enter the stop loss percentage, if no stop loss trigger to be used enter 0: ")
-    if stop_loss.isnumeric():
-        stop_loss_percentage = float(stop_loss)
-        return stop_loss_percentage
-    else:
-        print('A non-numeric value was entered please')
-        stop_loss_p()
+    while True:
+        stop_loss = input("Enter the stop loss percentage, if no stop loss trigger to be used enter 0: ")
+        if stop_loss.isnumeric():
+            stop_loss_percentage = float(stop_loss)
+            break
+        else:
+            print('A non-numeric value was entered please')
+    return stop_loss_percentage
 
 
 def data_select():
-    stockname = input("Please enter the stock ticker name you would like to analyze: ")
-    start, end = date_select()
-    commission = commission_set()
-    portfolio_initial_value = port_initial_val()
-    stop_loss_percentage = stop_loss_p()
-    try:
-        stock_dataframe = data.DataReader(stockname.upper(), 'google', start, end)
-        return stockname.upper(), stock_dataframe, portfolio_initial_value, commission, stop_loss_percentage
-    except:
-        print('Stock ticker name is invalid please reenter')
-        data_select()
+    run = True
+    while run:
+        stockname = input("Please enter the stock ticker name you would like to analyze: ")
+        start, end = date_select()
+        commission = commission_set()
+        portfolio_initial_value = port_initial_val()
+        stop_loss_percentage = stop_loss_p()
+        try:
+            stock_dataframe = data.DataReader(stockname.upper(), 'google', start, end)
+            run = False
+        except:
+            print('Stock ticker name is invalid please reenter')
+    return stockname.upper(), stock_dataframe, portfolio_initial_value, commission, stop_loss_percentage
 
 
-def stock_analytics_select(stockname, Stock, port_value, comm, s_l_p):
-    tool = input("Which analysis tool would you like to use: SMA, MACD, Bollinger Bands, RSI: ")
-    if tool.lower() == 'sma':
-        sma(stockname, Stock, port_value, comm, s_l_p)
-    elif tool.lower() == 'macd':
-        macd(stockname, Stock, port_value, comm, s_l_p)
-    elif tool.lower() == 'bollinger bands':
-        bbands(stockname, Stock, port_value, comm, s_l_p)
-    elif tool.lower() == 'rsi':
-        rsi(stockname, Stock, port_value, comm, s_l_p)
-    else:
-        print('Stock analysis tool entered incorrectly')
-        stock_analytics_select()
+def stock_analytics_select(stock_name, stock, port_value, comm, s_l_p):
+    while True:
+        tool = input("Which analysis tool would you like to use: SMA, MACD, Bollinger Bands, RSI: ")
+        if tool.lower() == 'sma':
+            sma(stock_name, stock, port_value, comm, s_l_p)
+            break
+        elif tool.lower() == 'macd':
+            macd(stock_name, stock, port_value, comm, s_l_p)
+            break
+        elif tool.lower() == 'bollinger bands' or tool.lower() == 'bbands':
+            bbands(stock_name, stock, port_value, comm, s_l_p)
+            break
+        elif tool.lower() == 'rsi':
+            rsi(stock_name, stock, port_value, comm, s_l_p)
+            break
+        else:
+            print('Stock analysis tool entered incorrectly')
 
 
 def stock_analytics_run():
-    stockname, stock, port_value, comm, s_l_p = data_select()
-    stock_analytics_select(stockname, stock, port_value, comm, s_l_p)
-    run_again = input("Would you like to analyze the same stock using a different analysis tool? (yes/no)")
-    if run_again.lower() == 'yes':
-        stock_analytics_select(stockname, stock, port_value, comm, s_l_p)
+    first_run = True
+    while True:
+        if first_run:
+            stockname, stock, port_value, comm, s_l_p = data_select()
+            stock_analytics_select(stockname, stock, port_value, comm, s_l_p)
+            first_run = False
+        elif not first_run:
+            run_again = input("Would you like to analyze the same stock using a different analysis tool? (yes/no)")
+            if run_again.lower() == 'yes' or run_again.lower() == 'y':
+                stock_analytics_select(stockname, stock, port_value, comm, s_l_p)
+            else:
+                diff_stock = input(
+                    "Would you like to analyze the a different stock using the same portfolio, commission and stop loss values? (yes/no)")
+                if diff_stock == 'yes' or diff_stock == 'y':
+                    stockname = input("Please enter the stock ticker name you would like to analyze: ")
+                    stock_analytics_select(stockname, stock, port_value, comm, s_l_p)
+                else:
+                    break
 
 
 stock_analytics_run()
