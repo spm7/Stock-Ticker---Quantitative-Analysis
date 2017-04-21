@@ -9,108 +9,57 @@ import seaborn as sns
 sns.set_style('whitegrid')
 
 
+# Buy/sell signal
 def buy_sell(data_frame, portfolio_value, commission, stop_loss):
     buying_power = portfolio_value
-    if stop_loss == 0:
+    if not stop_loss or stop_loss == 0:
         stop_loss_percent = 0
     else:
         stop_loss_percent = 1 - (stop_loss / 100)
     buy_price = 0
     shares = 0
     value = 0
-    for i in range(0, len(data_frame['Buy/Sell'])):
-        date = data_frame[
-            (data_frame['Close'] == data_frame.ix[i]['Close']) & (data_frame['Open'] == data_frame.ix[i]['Open'])].index
-        data_frame.set_value(date, 'Own', value)
-        data_frame.set_value(date, 'Shares', shares)
-        data_frame.set_value(date, 'Buying Power', buying_power)
-        if data_frame.ix[i]['Buy/Sell'] == 1 and data_frame.ix[i]['Own'] == 0:
+    for i in data_frame.index.values:
+        data_frame.set_value(i, 'Own', value)
+        data_frame.set_value(i, 'Shares', shares)
+        data_frame.set_value(i, 'Buying Power', buying_power)
+        port_val = data_frame.ix[i]['Buying Power'] + data_frame.ix[i]['Shares'] * data_frame.ix[i]['Open']
+        data_frame.set_value(i, 'Portfolio', port_val)
+        if data_frame.ix[i]['Buy/Sell'] == 1 and data_frame.ix[i]['Own'] == 0 and (
+                    commission + data_frame.ix[i]['Open']) < data_frame.ix[i]['Buying Power']:
             value = 1
-            buying_power -= commission
+            # 2 times commission subtracted so that there is enough to the sell the shares
+            buying_power -= 2 * commission
             shares = math.floor(buying_power / data_frame.ix[i]['Open'])
-            buying_power = buying_power - shares * data_frame.ix[i]['Open']
-            data_frame.set_value(date, 'Buy or Sell', 1)
+            buying_power = buying_power - shares * data_frame.ix[i]['Open'] + commission
+            data_frame.set_value(i, 'Buy or Sell', 1)
             buy_price = data_frame.ix[i]['Open']
-        elif data_frame.ix[i]['Buy/Sell'] == -1 and data_frame.ix[i]['Own'] == 1:
+        elif data_frame.ix[i]['Buy/Sell'] == -1 and data_frame.ix[i]['Own'] == 1 and commission < \
+                data_frame.ix[i][
+                    'Buying Power']:
             value = 0
             buying_power -= commission
             buying_power = buying_power + shares * data_frame.ix[i]['Open']
             shares = 0
-            data_frame.set_value(date, 'Buy or Sell', -1)
+            data_frame.set_value(i, 'Buy or Sell', -1)
         # Stoploss condition
-        if data_frame.ix[i]['Close'] <= buy_price * stop_loss_percent and data_frame.ix[i]['Own'] == 1:
+        if data_frame.ix[i]['Close'] <= buy_price * stop_loss_percent and data_frame.ix[i][
+            'Own'] == 1 and commission < \
+                data_frame.ix[i]['Buying Power']:
             value = 0
             buying_power -= commission
             buying_power = buying_power + shares * data_frame.ix[i]['Open']
             shares = 0
-            data_frame.set_value(date, 'Buy or Sell', -1)
+            data_frame.set_value(i, 'Buy or Sell', -1)
+
     data_frame.drop('Buy/Sell', axis=1, inplace=True)
-    data_frame['Portfolio'] = data_frame['Buying Power'] + data_frame['Shares'] * data_frame['Open']
 
 
-def plot_decorator(function):
-    def signals(dataframe, tool, col, label, color):
-        function(dataframe, tool, col, label, color)
-        print()
-        if tool[0].empty == 0:
-            plt.plot(tool[0].index, tool[0][col], marker='^', markersize=10, linestyle="None",
-                     color='g', label='Buy')
-        if tool[1].empty == 0:
-            plt.plot(tool[1].index, tool[1][col], marker='v', markersize=10, linestyle="None",
-                     color='r', label='Sell')
-        plt.xlabel('Date')
-        plt.legend(loc='upper left')
-
-    return signals
-
-
-@plot_decorator
-def close_plot(dataframe, tool, col, label, color):
-    dataframe[col].plot(label=label, color=color)
-    plt.title(label[:-1]+'ing Price')
-    plt.ylabel('Share Price')
-
-
-@plot_decorator
-def signal_plot(dataframe, tool, col, label, color):
-    dataframe[col].plot(label=label, color=color)
-
-
-@plot_decorator
-def port_plot(dataframe, tool, col, label, color):
-    dataframe[col].plot(label=label, color=color)
-    plt.title('Portfolio')
-    plt.ylabel('Portfolio Value')
-
-
-def sma_fast_slow():
-    while True:
-        fast = input("Please enter fast moving average day count if left blank will be set to 5 days: ")
-        if not fast:
-            fast = 5
-            break
-        elif fast.isnumeric():
-            fast = int(fast)
-            break
-        else:
-            print('Fast moving average was entered incorrectly')
-    while True:
-        slow = input("Please enter slow moving average day count if left blank will be set to 20 days: ")
-        if not slow:
-            slow = 20
-            break
-        elif slow.isnumeric():
-            slow = int(slow)
-            break
-        else:
-            print('Slow moving average was entered incorrectly')
-    return fast, slow
-
-
+# Analysis tools
 def sma(stock_name, stock, portfolio_initial_value, commission, stop_loss_percentage):
-    fast, slow = sma_fast_slow()
+    fast, slow = sma_sma_values()
     stock__s_m_a = stock.copy()
-    new_col = pd.DataFrame(columns=['Buy/Sell', 'Buy or Sell', 'Own', 'Shares', 'Buying Power'])
+    new_col = pd.DataFrame(columns=['Buy/Sell', 'Buy or Sell', 'Own', 'Shares', 'Buying Power', 'Portfolio'])
     stock__s_m_a = stock__s_m_a.join(new_col)
 
     stock__s_m_a['Fast SMA'] = stock__s_m_a['Close'].rolling(window=fast).mean()
@@ -149,65 +98,51 @@ def sma(stock_name, stock, portfolio_initial_value, commission, stop_loss_percen
 
 
 def macd(stock_name, stock, portfolio_initial_value, commission, stop_loss_percentage):
-    EMA = input("If you would like to set custom MACD values enter as [#,#,#], otherwise leave blank: ")
-    e_m_a_len = [12, 26, 9]
+    f_ema, s_ema, sig_ema = macd_ema_values()
 
     stock__m_a_c_d = stock.copy()
-    new_col = pd.DataFrame(columns=['Buy/Sell', 'Buy or Sell', 'Own', 'Shares', 'Buying Power'])
+    new_col = pd.DataFrame(columns=['Buy/Sell', 'Buy or Sell', 'Own', 'Shares', 'Buying Power', 'Portfolio'])
     stock__m_a_c_d = stock__m_a_c_d.join(new_col)
 
-    e_m_a_12 = 2 / (e_m_a_len[0] + 1) * (stock__m_a_c_d['Close'][e_m_a_len[0]]) + (1 - 2 / (e_m_a_len[0] + 1)) * \
-                                                                                  stock__m_a_c_d[
-                                                                                      'Close'][
-                                                                                  0:e_m_a_len[
-                                                                                      0]].mean()
-    e_m_a_26 = 2 / (e_m_a_len[1] + 1) * (stock__m_a_c_d['Close'][e_m_a_len[1]]) + (1 - 2 / (e_m_a_len[1] + 1)) * \
-                                                                                  stock__m_a_c_d[
-                                                                                      'Close'][
-                                                                                  0:e_m_a_len[
-                                                                                      1]].mean()
+    ema_f = 2 / (f_ema + 1) * (stock__m_a_c_d['Close'][f_ema - 1]) + (1 - 2 / (f_ema + 1)) * stock__m_a_c_d['Close'][
+                                                                                             0:f_ema].mean()
+    ema_s = 2 / (s_ema + 1) * (stock__m_a_c_d['Close'][s_ema - 1]) + (1 - 2 / (s_ema + 1)) * stock__m_a_c_d['Close'][
+                                                                                             0:s_ema].mean()
 
-    ema12 = []
+    ema_f_list = []
     for i in range(0, len(stock__m_a_c_d['Close'])):
-        if i < e_m_a_len[0]:
-            ema12.append(np.nan)
+        if i < f_ema - 1:
+            ema_f_list.append(np.nan)
         else:
-            ema12.append(e_m_a_12)
-            e_m_a_12 = (2 / (e_m_a_len[0] + 1)) * stock__m_a_c_d['Close'][i] + (1 - 2 / (e_m_a_len[0] + 1)) * e_m_a_12
+            ema_f_list.append(ema_f)
+            ema_f = (2 / (f_ema + 1)) * stock__m_a_c_d['Close'][i] + (1 - 2 / (f_ema + 1)) * ema_f
 
-    ema26 = []
+    ema_s_list = []
     for i in range(0, len(stock__m_a_c_d['Close'])):
-        if i <= e_m_a_len[1]:
-            ema26.append(np.nan)
+        if i < s_ema - 1:
+            ema_s_list.append(np.nan)
         else:
-            ema26.append(e_m_a_26)
-            e_m_a_26 = (2 / (e_m_a_len[1] + 1)) * stock__m_a_c_d['Close'][i] + (1 - 2 / (e_m_a_len[1] + 1)) * e_m_a_26
+            ema_s_list.append(ema_s)
+            ema_s = (2 / (s_ema + 1)) * stock__m_a_c_d['Close'][i] + (1 - 2 / (s_ema + 1)) * ema_s
 
-    stock__m_a_c_d['MACD'] = np.array(ema12) - np.array(ema26)
-    signal_val = 2 / (e_m_a_len[2] + 1) * (stock__m_a_c_d['MACD'][e_m_a_len[1] + e_m_a_len[2]]) + (1 - 2 / (
-        e_m_a_len[2] + 1)) * \
-                                                                                                  stock__m_a_c_d[
-                                                                                                      'MACD'][
-                                                                                                  e_m_a_len[1]:
-                                                                                                  e_m_a_len[
-                                                                                                      1] +
-                                                                                                  e_m_a_len[
-                                                                                                      2]].mean()
+    stock__m_a_c_d['MACD'] = np.array(ema_f_list) - np.array(ema_s_list)
+    signal_val = 2 / (sig_ema + 1) * (stock__m_a_c_d['MACD'][s_ema + sig_ema]) + (1 - 2 / (sig_ema + 1)) * \
+                                                                                 stock__m_a_c_d['MACD'][
+                                                                                 s_ema:s_ema + sig_ema].mean()
     signal = []
+
     for i in range(0, len(stock__m_a_c_d['Close'])):
-        if i <= e_m_a_len[1] + e_m_a_len[2]:
+        if i < s_ema + sig_ema:
             signal.append(np.nan)
         else:
             signal.append(signal_val)
-            signal_val = (2 / (e_m_a_len[2] + 1)) * stock__m_a_c_d['MACD'][i] + (
-                                                                                    1 - 2 / (
-                                                                                        e_m_a_len[2] + 1)) * signal_val
+            signal_val = (2 / (sig_ema + 1)) * stock__m_a_c_d['MACD'][i] + (1 - 2 / (sig_ema + 1)) * signal_val
 
     stock__m_a_c_d['Signal'] = signal
     stock__m_a_c_d['MACD_Hist'] = (stock__m_a_c_d['MACD'] - stock__m_a_c_d['Signal'])
 
-    inc_dec_MACD = np.sign(stock__m_a_c_d['MACD_Hist'])
-    stock__m_a_c_d['Buy/Sell'] = np.sign(inc_dec_MACD.diff())
+    inc_dec__m_a_c_d = np.sign(stock__m_a_c_d['MACD_Hist'])
+    stock__m_a_c_d['Buy/Sell'] = np.sign(inc_dec__m_a_c_d.diff())
 
     buy_sell(stock__m_a_c_d, portfolio_initial_value, commission, stop_loss_percentage)
     buy__m_a_c_d = stock__m_a_c_d[stock__m_a_c_d['Buy or Sell'] == 1]
@@ -236,18 +171,19 @@ def macd(stock_name, stock, portfolio_initial_value, commission, stop_loss_perce
 
 
 def bbands(stock_name, stock, portfolio_initial_value, commission, stop_loss_percentage):
+    ave_window, std_t = bbands_values()
     stock__b_bands = stock.copy()
-    new_col = pd.DataFrame(columns=['Buy/Sell', 'Buy or Sell', 'Own', 'Shares', 'Buying Power'])
+    new_col = pd.DataFrame(columns=['Buy/Sell', 'Buy or Sell', 'Own', 'Shares', 'Buying Power', 'Portfolio'])
     stock__b_bands = stock__b_bands.join(new_col)
 
     h_l_c = (stock__b_bands['High'] + stock__b_bands['Low'] + stock__b_bands['Close']) / 3
 
-    twenty_day_avg = h_l_c.rolling(window=20).mean()
-    twenty_day_std = h_l_c.rolling(window=20).std()
+    twenty_day_avg = h_l_c.rolling(window=ave_window).mean()
+    twenty_day_std = h_l_c.rolling(window=ave_window).std()
 
     # Calculating Upper and Lower Band
-    upp_band = twenty_day_avg + 2 * twenty_day_std
-    low_band = twenty_day_avg - 2 * twenty_day_std
+    upp_band = twenty_day_avg + std_t * twenty_day_std
+    low_band = twenty_day_avg - std_t * twenty_day_std
 
     # Buy and Sell indicators, based on when above or below Bollinger Bands
     over = ((stock__b_bands['Close'] - upp_band).apply(lambda x: x > 0))
@@ -282,12 +218,10 @@ def bbands(stock_name, stock, portfolio_initial_value, commission, stop_loss_per
 
 
 def rsi(stock_name, stock, portfolio_initial_value, commission, stop_loss_percentage):
-    top__b_band = 70
-    lower__b_band = 30
-    interval = 14
+    top__b_band, lower__b_band, interval = rsi_values()
 
     stock__r_s_i = stock.copy()
-    new_col = pd.DataFrame(columns=['Buy/Sell', 'Buy or Sell', 'Own', 'Shares', 'Buying Power'])
+    new_col = pd.DataFrame(columns=['Buy/Sell', 'Buy or Sell', 'Own', 'Shares', 'Buying Power', 'Portfolio'])
     stock__r_s_i = stock__r_s_i.join(new_col)
 
     # Determining gains and losses on daily basis. Binning gains and losses
@@ -351,20 +285,95 @@ def rsi(stock_name, stock, portfolio_initial_value, commission, stop_loss_percen
     plt.show()
 
 
-def date_select():
-    run = True
-    while run:
-        date_run = input(
-            "Do you want the date range to be a custom date set or have today as last analysis day (custom/today): ")
-        date_run = date_run.lower()
-        if date_run == 'today':
-            start, end = today_start()
-            run = False
-        elif date_run == 'custom':
-            start, end = custom_start()
-            run = False
+# Plot creation
+def plot_decorator(function):
+    def signals(dataframe, tool, col, label, color):
+        function(dataframe, tool, col, label, color)
+        print()
+        if tool[0].empty == 0:
+            plt.plot(tool[0].index, tool[0][col], marker='^', markersize=10, linestyle="None",
+                     color='g', label='Buy')
+        if tool[1].empty == 0:
+            plt.plot(tool[1].index, tool[1][col], marker='v', markersize=10, linestyle="None",
+                     color='r', label='Sell')
+        plt.xlabel('Date')
+        plt.legend(loc='upper left')
+    return signals
+
+
+@plot_decorator
+def close_plot(dataframe, tool, col, label, color):
+    dataframe[col].plot(label=label, color=color)
+    plt.title(label[:-1] + 'ing Price')
+    plt.ylabel('Share Price')
+
+
+@plot_decorator
+def signal_plot(dataframe, tool, col, label, color):
+    dataframe[col].plot(label=label, color=color)
+
+
+@plot_decorator
+def port_plot(dataframe, tool, col, label, color):
+    dataframe[col].plot(label=label, color=color)
+    plt.title('Portfolio')
+    plt.ylabel('Portfolio Value')
+
+
+# Initial data selection
+def port_initial_val():
+    while True:
+        port = input("Please enter your initial portfolio value with no decimal values: ")
+        try:
+            portfolio_initial_value = int(port)
+            break
+        except ValueError:
+            print('Value was entered incorrectly')
+    return portfolio_initial_value
+
+
+def commission_set():
+    while True:
+        comm = input("Enter the stock broker's commission fee. Leave blank if no stop loss trigger to be used: : ")
+        if not comm.split():
+            comm = 0
+            break
         else:
-            print('Value entered incorrectly')
+            try:
+                comm = float(comm)
+                break
+            except ValueError:
+                print('A non-numeric value was entered')
+    return comm
+
+
+def stop_loss_p():
+    stop_loss_percentage = []
+    while True:
+        stop_loss = input("Enter the stop loss percentage. Leave blank if no stop loss trigger to be used: ")
+        if not stop_loss.split():
+            break
+        else:
+            try:
+                stop_loss_percentage = float(stop_loss)
+                break
+            except ValueError:
+                print('A non-numeric value was entered')
+    return stop_loss_percentage
+
+
+def date_select():
+    while True:
+        date_run = input(
+            "To use use today as the last analysis day leave blank, otherwise type 'custom' to select exact dates: ")
+        if not date_run.split():
+            start, end = today_start()
+            break
+        elif date_run.lower() == 'custom':
+            start, end = custom_start()
+            break
+        else:
+            print('Value was entered incorrectly')
     return start, end
 
 
@@ -376,78 +385,55 @@ def today_start():
             start = datetime.date.today() - datetime.timedelta(days=float(len_dates) * 30)
             break
         else:
-            print('Non-numeric value entered')
+            print('A non-numeric value was entered'')
     return start, end
 
 
 def custom_start():
     while True:
-        start = input("Enter custom start date YYYY/MM/DD: ")
-        end = input("Enter custom end date YYYY/MM/DD: ")
-        dates_end = end.split('/')
-        dates_start = start.split('/')
-        if start > end:
-            print('Start date comes after end date, reenter dates')
-        elif datetime.date(dates_end[0], dates_end[1], dates_end[2]) > datetime.date.today():
-            print('End date is in the future, reenter dates')
-        elif len(start) != 10 or len(end) != 10:
-            print('Incorrect date format')
-        elif 1 >= dates_start[1] >= 13 and 1 >= dates_end[1] >= 13:
-            print('Dates entered incorrectly')
-        else:
-            break
+        start = input("Enter the custom start date as YYYY-MM-DD: ")
+        try:
+            dates_start = list(map(int, start.split('-')))
+            if len(start) != 10:
+                print('Incorrect date format')
+            elif 1 > dates_start[1] > 12 or 1 > dates_start[2] > 31:
+                print('Date entered incorrectly')
+            else:
+                break
+        except ValueError:
+            print('Date entered incorrectly')
+    while True:
+        end = input("Enter the custom end date as YYYY-MM-DD: ")
+        try:
+            dates_end = list(map(int, end.split('-')))
+            if start > end:
+                print('Start date comes after end date, please reenter dates')
+                custom_start()
+            elif datetime.date(dates_end[0], dates_end[1], dates_end[2]) > datetime.date.today():
+                print('End date is in the future, reenter dates')
+            elif len(end) != 10:
+                print('Incorrect date format')
+            elif 1 > dates_end[1] > 12 or 1 > dates_end[2] > 31:
+                print('Dates entered incorrectly')
+            else:
+                break
+        except ValueError:
+            print('Date entered incorrectly')
     return start, end
 
 
-def commission_set():
+def stock_data_select(start, end):
     while True:
-        comm = input("Enter the stock broker commission rate: ")
-        if comm.isnumeric():
-            commission = float(comm)
-            break
-        else:
-            print('A non-numeric value was entered please')
-    return commission
-
-
-def port_initial_val():
-    while True:
-        port = input("Enter the initial portfolio value: ")
-        if port.isnumeric():
-            portfolio_initial_value = float(port)
-            break
-        else:
-            print('A non-numeric value was entered please')
-    return portfolio_initial_value
-
-
-def stop_loss_p():
-    while True:
-        stop_loss = input("Enter the stop loss percentage, if no stop loss trigger to be used enter 0: ")
-        if stop_loss.isnumeric():
-            stop_loss_percentage = float(stop_loss)
-            break
-        else:
-            print('A non-numeric value was entered please')
-    return stop_loss_percentage
-
-
-def data_select():
-    run = True
-    while run:
-        stockname = input("Please enter the stock ticker name you would like to analyze: ")
-        start, end = date_select()
-        commission = commission_set()
-        portfolio_initial_value = port_initial_val()
-        stop_loss_percentage = stop_loss_p()
+        stockname = input("Please enter the stock ticker symbol: ")
         try:
             stock_dataframe = data.DataReader(stockname.upper(), 'google', start, end)
-            run = False
-        except:
+            break
+        except ValueError:
             print('Stock ticker name is invalid please reenter')
-    return stockname.upper(), stock_dataframe, portfolio_initial_value, commission, stop_loss_percentage
+    return stockname.upper(), stock_dataframe
 
 
+# Analysis tool selection
 def stock_analytics_select(stock_name, stock, port_value, comm, s_l_p):
     while True:
         tool = input("Which analysis tool would you like to use: SMA, MACD, Bollinger Bands, RSI: ")
@@ -464,14 +450,161 @@ def stock_analytics_select(stock_name, stock, port_value, comm, s_l_p):
             rsi(stock_name, stock, port_value, comm, s_l_p)
             break
         else:
-            print('Stock analysis tool entered incorrectly')
+            print('Stock analysis tool was entered incorrectly')
 
 
+# Analysis tool values
+def sma_sma_values():
+    fast = 5
+    slow = 20
+    while True:
+        sma_custom = input("To use 5,20 day moving average values press enter, otherwise enter 'custom': ")
+        if not sma_custom.split():
+            break
+        elif sma_custom.lower() == 'custom':
+            while True:
+                fast = input("Please enter fast moving average day count: ")
+                try:
+                    fast = int(fast)
+                    break
+                except ValueError:
+                    print('Value entered incorrectly')
+            while True:
+                slow = input("Please enter slow moving average day count: ")
+                try:
+                    slow = int(slow)
+                    if fast > slow:
+                        print('The fast moving average is greater than the slow moving average')
+                    else:
+                        break
+                except ValueError:
+                    print('Value entered incorrectly')
+            break
+        else:
+            print('Value entered incorrectly')
+    return fast, slow
+
+
+def macd_ema_values():
+    fast_ema = 12
+    slow_ema = 26
+    signal_ema = 9
+    while True:
+        ema_custom = input(
+            "To use 12,26,9 day exponential moving average values press enter, otherwise enter 'custom': ")
+        if not ema_custom.split():
+            break
+        elif ema_custom.lower() == 'custom':
+            while True:
+                fast_ema = input("Please enter the fast exponential moving average day count: ")
+                try:
+                    fast_ema = int(fast_ema)
+                    break
+                except ValueError:
+                    print('Value entered incorrectly')
+            while True:
+                slow_ema = input("Please enter the slow moving average day count: ")
+                try:
+                    slow_ema = int(slow_ema)
+                    if fast_ema > slow_ema:
+                        print('The fast exponential moving average is greater than the slow exponential moving average')
+                        macd_ema_days()
+                    else:
+                        break
+                except ValueError:
+                    print('Value entered incorrectly')
+            while True:
+                signal_ema = input("Please enter the signal exponential moving average day count: ")
+                try:
+                    signal_ema = int(signal_ema)
+                    break
+                except ValueError:
+                    print('Value entered incorrectly')
+            break
+        else:
+            print('Value entered incorrectly')
+    return fast_ema, slow_ema, signal_ema
+
+
+def bbands_values():
+    window = 20
+    std_t = 2
+    while True:
+        bbands_custom = input(
+            "To use 20 day moving average and 2 * standard deviation press enter, otherwise enter 'custom': ")
+        if not bbands_custom.split():
+            break
+        elif bbands_custom.lower() == 'custom':
+            while True:
+                window = input("Please enter the moving average day count: ")
+                try:
+                    window = int(window)
+                    break
+                except ValueError:
+                    print('Value entered incorrectly')
+            while True:
+                std_t = input("Please enter number of standard deviations to use in band calculation: ")
+                try:
+                    std_t = int(std_t)
+                    break
+                except ValueError:
+                    print('Value entered incorrectly')
+            break
+        else:
+            print('Value entered incorrectly')
+    return window, std_t
+
+
+def rsi_values():
+    top_band = 70
+    lower_band = 30
+    interval = 14
+    while True:
+        rsi_custom = input(
+            "To use 70 and 30 as the values of the top and bottom bands and 14 days for the interval press enter, otherwise enter 'custom': ")
+        if not rsi_custom.split():
+            break
+        elif rsi_custom.lower() == 'custom':
+            while True:
+                top_band = input("Please enter the value for the upper band: ")
+                try:
+                    top_band = int(top_band)
+                    break
+                except ValueError:
+                    print('Value entered incorrectly')
+            while True:
+                lower_band = input("Please enter the value for the lower band: ")
+                try:
+                    lower_band = int(lower_band)
+                    if lower_band > top_band:
+                        print('Bottom band is set to a higher value than the top band')
+                        rsi_values()
+                    break
+                except ValueError:
+                    print('Value entered incorrectly')
+            while True:
+                interval = input("Please enter the interval day count: ")
+                try:
+                    interval = int(interval)
+                    break
+                except ValueError:
+                    print('Value entered incorrectly')
+            break
+        else:
+            print('Value entered incorrectly')
+    return top_band, lower_band, interval
+
+
+# Putting it together
 def stock_analytics_run():
+    port_value = port_initial_val()
+    comm = commission_set()
+    s_l_p = stop_loss_p()
+    start, end = date_select()
+    stockname, stock = stock_data_select(start, end)
     first_run = True
     while True:
         if first_run:
-            stockname, stock, port_value, comm, s_l_p = data_select()
             stock_analytics_select(stockname, stock, port_value, comm, s_l_p)
             first_run = False
         elif not first_run:
@@ -482,7 +615,8 @@ def stock_analytics_run():
                 diff_stock = input(
                     "Would you like to analyze the a different stock using the same portfolio, commission and stop loss values? (yes/no)")
                 if diff_stock == 'yes' or diff_stock == 'y':
-                    stockname = input("Please enter the stock ticker name you would like to analyze: ")
+                    stockname, stock = stock_data_select(start, end)
+
                     stock_analytics_select(stockname, stock, port_value, comm, s_l_p)
                 else:
                     break
