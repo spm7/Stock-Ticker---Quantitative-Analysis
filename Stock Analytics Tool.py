@@ -323,18 +323,20 @@ def port_plot(dataframe, tool, col, label, color):
 # Initial data selection
 def port_initial_val():
     while True:
-        port = input("Please enter your initial portfolio value with no decimal values: ")
         try:
-            portfolio_initial_value = int(port)
-            break
+            portfolio_initial_value = int(input("Please enter your initial portfolio value with no decimal values: "))
         except ValueError:
             print('Value was entered incorrectly')
+        if portfolio_initial_value<0:
+            print('Portfolio value cannot be negative')
+        else:
+            break
     return portfolio_initial_value
 
 
 def commission_set():
     while True:
-        comm = input("Enter the stock broker's commission fee. Leave blank if no stop loss trigger to be used: : ")
+        comm = input("Enter the stock broker's commission fee. Leave blank if no stop loss trigger to be used: ")
         if not comm.split():
             comm = 0
             break
@@ -365,7 +367,7 @@ def stop_loss_p():
 def date_select():
     while True:
         date_run = input(
-            "To use use today as the last analysis day leave blank, otherwise type 'custom' to select exact dates: ")
+            "To use today as the last analysis day leave blank, otherwise type 'custom' to select exact dates: ")
         if not date_run.split():
             start, end = today_start()
             break
@@ -385,7 +387,7 @@ def today_start():
             start = datetime.date.today() - datetime.timedelta(days=float(len_dates) * 30)
             break
         else:
-            print('A non-numeric value was entered'')
+            print('A non-numeric value was entered')
     return start, end
 
 
